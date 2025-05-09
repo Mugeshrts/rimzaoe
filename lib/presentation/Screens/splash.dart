@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -25,6 +26,18 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void navigateToNext() async {
+    // final connectivityResult = await Connectivity().checkConnectivity();
+    // if (connectivityResult == ConnectivityResult.none) {
+    //   // No internet connection
+    //   Get.snackbar(
+    //     'No Internet',
+    //     'There is no internet, please check your connection',
+    //     snackPosition: SnackPosition.BOTTOM,
+    //     backgroundColor: Colors.red,
+    //     colorText: Colors.white,
+    //   );
+    //   return; // Do not proceed
+    // }
     // Check and store deviceId if not already stored
     String? deviceId = storage.read('deviceId');
     if (deviceId == null || deviceId.isEmpty) {

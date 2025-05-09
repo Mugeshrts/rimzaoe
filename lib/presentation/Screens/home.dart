@@ -54,8 +54,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => _deviceBloc,
+    return BlocProvider.value(
+      value: _deviceBloc,
       child: Scaffold(
         drawer: Drawer(
           backgroundColor: Colors.blue.shade50,
@@ -64,10 +64,7 @@ class _DashboardPageState extends State<DashboardPage> {
               DrawerHeader(
                 decoration: BoxDecoration(color: Colors.blue.shade900),
                 child: Center(
-                  child: Text(
-                    "Welcome 👋",
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),
+                  child: Text("Welcome 👋", style: TextStyle(color: Colors.white, fontSize: 20)),
                 ),
               ),
               ListTile(
@@ -82,7 +79,7 @@ class _DashboardPageState extends State<DashboardPage> {
           title: Text("Devices", style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.blue.shade900,
           actions: [
-            Center(child: Text("v1.8", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            Center(child: Text("v1.8", style: TextStyle(fontSize: 16))),
             BlocBuilder<DeviceBloc, DeviceState>(
               builder: (context, state) {
                 if (state is DeviceLoaded) {
@@ -91,14 +88,14 @@ class _DashboardPageState extends State<DashboardPage> {
                       await MqttService.initMqtt();
                       _deviceBloc.add(RefreshMQTTData());
                     },
-                                       icon: Lottie.asset(
+                    icon: Lottie.asset(
                       state.faulty == "yes"
                           ? 'assets/lotties/red.json'
                           : state.mqttCheck
                               ? 'assets/lotties/green.json'
                               : 'assets/lotties/red.json',
-                      width: 80,
-                      height: 80,
+                      width: 60,
+                      height: 60,
                     ),
                   );
                 }
@@ -124,9 +121,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   fillColor: Colors.white,
                   filled: true,
                   prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -138,34 +133,33 @@ class _DashboardPageState extends State<DashboardPage> {
               return Center(child: CircularProgressIndicator());
             } else if (state is DeviceLoaded) {
               if (state.devices.isEmpty) {
-                return Center(
-                  child: Text("No device available", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                );
+                return Center(child: Text("No device available", style: TextStyle(fontSize: 18)));
               }
 
               return ListView.builder(
                 itemCount: state.devices.length,
                 itemBuilder: (context, index) {
                   final device = state.devices[index];
-                  final isDeviceAvailable = device.status.toLowerCase() == 'active';
-                  final isMQTTReceived = state.mqttReceivedDeviceIds.contains(device.imei);
+                  final isActive = device.status.toLowerCase() == 'active';
+                  final hasMqtt = state.mqttReceivedDeviceIds.contains(device.imei);
 
                   return GestureDetector(
                     onTap: () {
-                      if (isDeviceAvailable) {
-                        Get.to(() => ModeSelectionScreen(device: device));
+                      if (isActive) {
+                        // Get.to(() => ModeSelectionScreen(device: device));
+                        Get.to(() => ModeSelectionScreen(
+      imei: device.imei,
+      dbdata: device.data ?? '', 
+      device: device,
+      // device: device.deviceName,
+    ));
                       } else {
-                        Get.snackbar(
-                          "Notice",
-                          "There is no data available for this device.",
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.redAccent,
-                          colorText: Colors.white,
-                        );
+                        Get.snackbar("Notice", "There is no data available for this device.",
+                            backgroundColor: Colors.redAccent, colorText: Colors.white);
                       }
                     },
                     child: Card(
-                      color: isMQTTReceived ? Colors.white : Colors.red.shade300,
+                      color: hasMqtt ? Colors.white : Colors.red.shade300,
                       margin: EdgeInsets.all(10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       child: ListTile(
@@ -174,8 +168,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                             Text("SW Version: ${device.swVersion.isNotEmpty ? device.swVersion : 'N/A'}"),
-                             Text("Release Date: ${device.releaseDate.isNotEmpty ? device.releaseDate : 'N/A'}"),
+                            Text("SW Version: ${device.swVersion.isNotEmpty ? device.swVersion : 'N/A'}"),
+                            Text("Release Date: ${device.releaseDate.isNotEmpty ? device.releaseDate : 'N/A'}"),
                           ],
                         ),
                       ),
@@ -186,12 +180,10 @@ class _DashboardPageState extends State<DashboardPage> {
             } else if (state is DeviceError) {
               return Center(child: Text(state.message));
             }
-            return Container();
+            return SizedBox.shrink();
           },
         ),
       ),
     );
   }
 }
-
- 

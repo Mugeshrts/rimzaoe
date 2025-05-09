@@ -1,26 +1,3 @@
-// import 'package:flutter/material.dart';
-// import 'package:rimza1/data/user.dart';
-
-
-// class ModeSelectionScreen extends StatelessWidget {
-//   final DeviceModel device;
-
-//   const ModeSelectionScreen({Key? key, required this.device}) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Mode Selection'),
-//       ),
-//       body: Center(
-//         child: Text('Selected Device: ${device.deviceName}'),
-//       ),
-//     );
-//   }
-// }
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -30,13 +7,17 @@ import 'package:rimza1/Logic/bloc/modeselection/modeselection_bloc.dart';
 import 'package:rimza1/Logic/bloc/modeselection/modeselection_event.dart';
 import 'package:rimza1/Logic/bloc/modeselection/modeselection_state.dart';
 import 'package:rimza1/data/user.dart';
+import 'package:rimza1/presentation/Screens/addmusic.dart';
+import 'package:rimza1/presentation/Screens/dvmscreen.dart';
+import 'package:rimza1/presentation/Screens/regularmode.dart';
+import 'package:rimza1/presentation/Screens/scheduletask.dart';
 import 'package:rimza1/presentation/widget/widgets.dart';
 
 class ModeSelectionScreen extends StatelessWidget {
   // final Map<String, String> device;
   final DeviceModel device;
 
-  const ModeSelectionScreen({Key? key, required this.device}) : super(key: key);
+  const ModeSelectionScreen({Key? key, required this.device, required String imei, required String dbdata}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -53,16 +34,91 @@ class ModeSelectionScreen extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Get.back(),
-          ),
+          // leading: IconButton(
+          //   icon: Icon(Icons.arrow_back, color: Colors.white),
+          //   onPressed: () => Get.back(),
+          // ),
           actions: [
             Lottie.asset('assets/lotties/green.json', width: 60, height: 60),
             SizedBox(width: 10),
           ],
           iconTheme: IconThemeData(color: Colors.white),
         ),
+        drawer: Drawer(
+          // backgroundColor: Colors.white,
+        child: ListView(
+          children: <Widget>[
+            const UserAccountsDrawerHeader(
+              accountName: Text("username"),
+              accountEmail: SizedBox.shrink(),
+              currentAccountPicture: CircleAvatar(
+                // backgroundColor: Colors.white,
+                child: Text(
+                  "R",
+                  style: TextStyle(fontSize: 40.0),
+                ),
+              ),
+            ),
+            // if (Platform.isAndroid)
+            ListTile(
+              leading: const Icon(Icons.bluetooth),
+              title: const Text('Connect with Bluetooth'),
+              onTap: () {
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>BlueToothPage()));
+
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications),
+              title: const Text('Regular Mode'),
+              onTap: () {
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>NormalMode(mode:"normal",imei:widget.imei,data:mqtt_chek?all_day.normal:dball_day.normal)));
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>RegularMode(mode:"normal",imei:widget.imei)));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('Exam Mode'),
+              onTap: () {
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>RegularMode(mode:"exam",imei:widget.imei)));
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>ExamModeNew(mode:"exam",imei:widget.imei,data:mqtt_chek?all_day.exam:dball_day.exam)));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_month),
+              title: const Text('Holiday'),
+              onTap: () {
+                // Navigator.push(context, MaterialPageRoute(builder: (context)=>Holidaypage(imei:widget.imei)));
+              },
+            ),
+            // ListTile(
+            //   leading: const Icon(Icons.settings_bluetooth),
+            //   title: const Text('Bluetooth'),
+            //   onTap: () {
+            //     Navigator.push(context, MaterialPageRoute(builder: (context)=>BlueToothPage()));
+            //   },
+            // ),
+            // SwitchListTile(
+            //   title: const Text('Music Mode'),
+            //   value: switchValue1,
+            //   onChanged: (bool value) {
+            //     setState(() {
+            //       switchValue1 = value;
+            //     });
+            //   },
+            // ),
+            // SwitchListTile(
+            //   title: const Text('Ringer Mode'),
+            //   value: !switchValue1,
+            //   onChanged: (bool value) {
+            //     setState(() {
+            //       switchValue1 = value;
+            //     });
+            //   },
+            // ),
+          ],
+        ),
+      ),
         body: BlocBuilder<ModeSelectionBloc, ModeSelectionState>(
           builder: (context, state) {
             return Padding(
@@ -154,16 +210,16 @@ class ModeSelectionScreen extends StatelessWidget {
                     children: [
                       Column(
                         children: [
-                          // ModeCard(icon: Icons.alarm, text: "Regular Mode", onTap: () => Get.to(() => WeekTabPage())),
+                          ModeCard(icon: Icons.alarm, text: "Regular Mode", onTap: () => Get.to(() => WeekTabPage())),
                           ModeCard(icon: Icons.edit_document, text: "Exam Mode", onTap: () {}),
                           ModeCard(icon: Icons.calendar_month_outlined, text: "Holiday", onTap: () {}),
                         ],
                       ),
                       Column(
                         children: [
-                          // ModeCard(icon: Icons.music_note_sharp, text: "Music", onTap: () => Get.to(() => AudioListPage())),
-                          // ModeCard(icon: Icons.timer, text: "SVM", onTap: () => Get.to(() => Scheduletask())),
-                          // ModeCard(icon: Icons.speaker, text: "DVM", onTap: () => Get.to(() => Dvmscreen())),
+                          ModeCard(icon: Icons.music_note_sharp, text: "Music", onTap: () => Get.to(() => AudioListPage())),
+                           ModeCard(icon: Icons.timer, text: "SVM", onTap: () => Get.to(() => Scheduletask())),
+                           ModeCard(icon: Icons.speaker, text: "DVM", onTap: () => Get.to(() => Dvmscreen())),
                         ],
                       ),
                     ],

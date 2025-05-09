@@ -7,62 +7,54 @@ import 'package:uuid/uuid.dart';
 class MqttService {
   MqttService._();
   static late MqttClient client;
+  static final StreamController<String> _messageStreamController = StreamController<String>.broadcast();
+  static Stream<String> get messageStream => _messageStreamController.stream;
 
   static Future<void> initMqtt() async {
     var uuid = Uuid();
     String deviceId = uuid.v1();
 
     client = MqttServerClient("devices.iautobells.com", deviceId)
-      ..logging(on: false)
       ..port = 1883
+      ..logging(on: false)
       ..keepAlivePeriod = 60
       ..onDisconnected = _onDisconnected
-      ..onSubscribed = _onSubscribed
       ..onConnected = _onConnected
-      ..onUnsubscribed = _onUnsubscribed
+      ..onSubscribed = _onSubscribed
       ..onSubscribeFail = _onSubscribeFail
+      ..onUnsubscribed = _onUnsubscribed
       ..onBadCertificate = (Object cert) => true;
 
     client.connectionMessage = MqttConnectMessage()
         .authenticateAs('realiot', 'realmqtt@123')
         .startClean()
-        .withWillQos(MqttQos.exactlyOnce)
-        .withClientIdentifier(deviceId)
-        .withWillTopic('failed-Rimza')
-        .withWillMessage('connection-failed-Rimza');
+        .withWillQos(MqttQos.atLeastOnce)
+        .withClientIdentifier(deviceId);
 
-    await _connectMqtt();
-  }
-
-  static Future<void> _connectMqtt() async {
     try {
-      log('[MQTT] Connecting...');
       await client.connect();
     } catch (e) {
-      log('[MQTT] Connection failed: ${e.toString()}');
+      log('[MQTT] Connection failed: $e');
     }
-    log('[MQTT] Final connection state: ${client.connectionStatus!.state}');
+
+    if (client.connectionStatus?.state == MqttConnectionState.connected) {
+      _listen();
+    }
   }
 
-  static void _onConnected() {
-    log('[MQTT] Connected to broker');
+  static void _listen() {
+    client.updates?.listen((List<MqttReceivedMessage<MqttMessage>>? messages) {
+      final recMessage = messages![0].payload as MqttPublishMessage;
+      final payload = MqttPublishPayload.bytesToStringAsString(recMessage.payload.message);
+      _messageStreamController.add(payload);
+    });
   }
 
-  static void _onDisconnected() {
-    log('[MQTT] Disconnected. Status: ${client.connectionStatus?.state}');
-  }
-
-  static void _onSubscribed(String? topic) {
-    log('[MQTT] Subscribed: $topic');
-  }
-
-  static void _onUnsubscribed(String? topic) {
-    log('[MQTT] Unsubscribed: $topic');
-  }
-
-  static void _onSubscribeFail(String? topic) {
-    log('[MQTT] Subscribe failed: $topic');
-  }
+  static void _onConnected() => log('[MQTT] Connected');
+  static void _onDisconnected() => log('[MQTT] Disconnected');
+  static void _onSubscribed(String? topic) => log('[MQTT] Subscribed: $topic');
+  static void _onSubscribeFail(String? topic) => log('[MQTT] Subscribe failed: $topic');
+  static void _onUnsubscribed(String? topic) => log('[MQTT] Unsubscribed: $topic');
 
   static void subscribeTopic(String topic) {
     if (client.connectionStatus?.state == MqttConnectionState.connected) {
@@ -77,19 +69,9 @@ class MqttService {
     }
   }
 
-  static void disconnectMqtt() {
+  static Future<void> disconnectMqtt() async {
     if (client.connectionStatus?.state == MqttConnectionState.connected) {
       client.disconnect();
     }
-  }
-
-  static void reconnect() {
-    Future.delayed(Duration(seconds: 3), () async {
-      try {
-        await client.connect();
-      } catch (e) {
-        log('[MQTT] Reconnect failed: $e');
-      }
-    });
   }
 }
