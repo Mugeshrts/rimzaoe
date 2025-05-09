@@ -1,6 +1,3 @@
-
-
-//lsit of user's
 class DeviceModel {
   final String sno;
   final String imei;
@@ -25,6 +22,8 @@ class DeviceModel {
   final String? fitterDate;
   final String? userDate;
   final String? rechargeDate;
+  final String swVersion;
+  final String releaseDate;
 
   DeviceModel({
     required this.sno,
@@ -50,6 +49,8 @@ class DeviceModel {
     required this.fitterDate,
     required this.userDate,
     required this.rechargeDate,
+    this.swVersion = '',
+    this.releaseDate = '',
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -77,6 +78,8 @@ class DeviceModel {
       fitterDate: json['fitter_date'],
       userDate: json['user_date'],
       rechargeDate: json['recharge_date'],
+      swVersion: json['sw_version'] ?? '',
+      releaseDate: json['release_date'] ?? '',
     );
   }
 
@@ -105,6 +108,41 @@ class DeviceModel {
       "fitter_date": fitterDate,
       "user_date": userDate,
       "recharge_date": rechargeDate,
+      "sw_version": swVersion,
+      "release_date": releaseDate,
     };
+  }
+
+  DeviceModel copyWith({
+    String? swVersion,
+    String? releaseDate,
+  }) {
+    return DeviceModel(
+      sno: sno,
+      imei: imei,
+      username: username,
+      mode: mode,
+      regulerData: regulerData,
+      examData: examData,
+      holidayData: holidayData,
+      lastSync: lastSync,
+      data: data,
+      fitterId: fitterId,
+      deviceName: deviceName,
+      status: status,
+      qrCode: qrCode,
+      expiryDate: expiryDate,
+      paymentStatus: paymentStatus,
+      price: price,
+      image: image,
+      addedDate: addedDate,
+      storeDate: storeDate,
+      outDate: outDate,
+      fitterDate: fitterDate,
+      userDate: userDate,
+      rechargeDate: rechargeDate,
+      swVersion: swVersion ?? this.swVersion,
+      releaseDate: releaseDate ?? this.releaseDate,
+    );
   }
 }

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:rimza1/presentation/Screens/dummy.dart';
+import 'package:rimza1/presentation/Screens/modeselection.dart';
 import 'package:rimza1/presentation/Screens/home.dart';
 import 'package:rimza1/presentation/Screens/login.dart';
 import 'package:uuid/uuid.dart';

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:lottie/lottie.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:rimza1/Core/network.dart';
-import 'package:rimza1/data/user.dart';
-import 'package:rimza1/presentation/Screens/dummy.dart';
+import 'package:rimza1/Logic/bloc/home/bloc/home_bloc.dart';
+import 'package:rimza1/Logic/bloc/home/bloc/home_event.dart';
+import 'package:rimza1/Logic/bloc/home/bloc/home_state.dart';
+import 'package:rimza1/presentation/Screens/modeselection.dart';
 import 'package:rimza1/presentation/Screens/login.dart';
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:rimza1/service/mqtt.dart';
-
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -20,74 +19,23 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  List<DeviceModel> devices = [];
-  List<DeviceModel> filteredDevices = [];
-  bool isLoading = true;
-  bool mqttConnected = true;
-  final box = GetStorage();
-  final String apiUrl = Dashboard_url;
+  late DeviceBloc _deviceBloc;
   final TextEditingController _searchController = TextEditingController();
+  final box = GetStorage();
 
   @override
   void initState() {
     super.initState();
-    fetchDevicesAndConnectMQTT();
+    _deviceBloc = DeviceBloc(apiUrl: Dashboard_url, storage: box);
+    _deviceBloc.add(FetchDevices());
+    _initMqttAndRefresh();
   }
 
-  Future<void> fetchDevicesAndConnectMQTT() async {
-    final String? mobile = box.read('mobile');
-    print('[FETCH DEVICES] Mobile: $mobile');
-    if (mobile == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Mobile number not found")));
-      return;
-    }
-
-    final url = Uri.parse(apiUrl);
-    print('[FETCH DEVICES] API URL: $url');
+  Future<void> _initMqttAndRefresh() async {
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {"action": "get_device", "mobile": mobile},
-      );
-
-      print('[FETCH DEVICES] Response Code: ${response.statusCode}');
-      print('[GET DEVICE] Response: ${response.body}');
-
-      final decoded = jsonDecode(response.body);
-      if (decoded is List) {
-        final List<DeviceModel> loadedDevices = decoded.map((e) => DeviceModel.fromJson(e)).toList();
-        print('[FETCH DEVICES] Parsed ${decoded.length} devices');
-        setState(() {
-         devices = loadedDevices;
-         filteredDevices = loadedDevices;
-         isLoading = false;
-        });
-
-        // 🔗 Connect to MQTT and subscribe to each device topic
-        await MqttService.initMqtt();
-        MqttService.client.onConnected = () {
-          setState(() => mqttConnected = true);
-          for (var device in devices) {
-            MqttService.subscribeTopic('device/${device.imei}');
-          }
-        };
-      } else {
-        print('[FETCH DEVICES] Unexpected response structure');
-        setState(() => isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Unexpected response format")));
-      }
-    } catch (e) {
-      print('[FETCH DEVICES] Exception: $e');
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to load devices: $e")));
-    }
+      await MqttService.initMqtt();
+      _deviceBloc.add(RefreshMQTTData());
+    } catch (_) {}
   }
 
   void handleLogout() {
@@ -98,149 +46,152 @@ class _DashboardPageState extends State<DashboardPage> {
       textConfirm: "Logout",
       confirmTextColor: Colors.white,
       onConfirm: () {
-        final box = GetStorage();
-        box.erase(); // clears all storage
+        box.erase();
         Get.offAll(() => LoginScreen());
       },
     );
   }
 
-   void filterSearch(String query) {
-    if (query.isEmpty) {
-      setState(() => filteredDevices = devices);
-    } else {
-      setState(() {
-        filteredDevices = devices.where((device) =>
-            device.deviceName.toLowerCase().contains(query.toLowerCase())
-        ).toList();
-      });
-    }
-  } 
- 
-
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
-        backgroundColor: Colors.blue.shade50,
-        child: Column(
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue.shade900),
-              child: Center(
-                child: Text(
-                  "Welcome 👋",
-                  style: TextStyle(color: Colors.white, fontSize: 20),
+    return BlocProvider(
+      create: (_) => _deviceBloc,
+      child: Scaffold(
+        drawer: Drawer(
+          backgroundColor: Colors.blue.shade50,
+          child: Column(
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(color: Colors.blue.shade900),
+                child: Center(
+                  child: Text(
+                    "Welcome 👋",
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
                 ),
               ),
-            ),
-            ListTile(
-              leading: Icon(Icons.logout, color: Colors.red),
-              title: Text("Logout"),
-              onTap: handleLogout,
+              ListTile(
+                leading: Icon(Icons.logout, color: Colors.red),
+                title: Text("Logout"),
+                onTap: handleLogout,
+              ),
+            ],
+          ),
+        ),
+        appBar: AppBar(
+          title: Text("Devices", style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.blue.shade900,
+          actions: [
+            Center(child: Text("v1.8", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            BlocBuilder<DeviceBloc, DeviceState>(
+              builder: (context, state) {
+                if (state is DeviceLoaded) {
+                  return IconButton(
+                    onPressed: () async {
+                      await MqttService.initMqtt();
+                      _deviceBloc.add(RefreshMQTTData());
+                    },
+                                       icon: Lottie.asset(
+                      state.faulty == "yes"
+                          ? 'assets/lotties/red.json'
+                          : state.mqttCheck
+                              ? 'assets/lotties/green.json'
+                              : 'assets/lotties/red.json',
+                      width: 80,
+                      height: 80,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
             ),
           ],
-        ),
-      ),
-
-      appBar: AppBar(
-        title: Text(
-          "Devices (${devices.length})",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.blue.shade900,
-        actions: [
-          Center(
-            child: Text(
-              "v1.8",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-          Lottie.asset(
-            mqttConnected
-                ? 'assets/lotties/93167-sphere.json'
-                : 'assets/lotties/91142-red-pulsing-dot.json',
-            width: 50,
-            height: 50,
-          ),
-        ],
-        leading: Builder(
-          builder:
-              (context) => IconButton(
-                icon: Icon(Icons.menu),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              onChanged: filterSearch,
-              decoration: InputDecoration(
-                hintText: 'Search Devices...',
-                fillColor: Colors.white,
-                filled: true,
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ),
-      ),
-     
-       body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : filteredDevices.isEmpty
-              ? Center(
-                  child: Text(
-                    "No device available",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(60),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (query) => _deviceBloc.add(SearchDevices(query)),
+                decoration: InputDecoration(
+                  hintText: 'Search Devices...',
+                  fillColor: Colors.white,
+                  filled: true,
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: filteredDevices.length,
-                  itemBuilder: (context, index) {
-                    final device = filteredDevices[index];
-                    return GestureDetector(
-                       onTap: () {
-    final isDeviceAvailable = device.status.toLowerCase() == 'active';
-    if (isDeviceAvailable) {
-      Get.to(() => ModeSelectionScreen(device: device));
-    } else {
-      Get.snackbar(
-        "Notice",
-        "There is no data available for this device.",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
-    }
-  },
-                      child: Card(
-                        margin: EdgeInsets.all(10),
-                         shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                        child: ListTile(
-                          leading: Image.asset('assets/images/Bell_Ring.png'),
-                          title: Text(device.deviceName),
-                          subtitle: Text("IMEI: ${device.imei}"),
-                          trailing: Text(
-                            device.status,
-                            style: TextStyle(
-                              color: device.status == "Active"
-                                  ? Colors.green
-                                  : Colors.red,
-                            ),
-                          ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        body: BlocBuilder<DeviceBloc, DeviceState>(
+          builder: (context, state) {
+            if (state is DeviceLoading) {
+              return Center(child: CircularProgressIndicator());
+            } else if (state is DeviceLoaded) {
+              if (state.devices.isEmpty) {
+                return Center(
+                  child: Text("No device available", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: state.devices.length,
+                itemBuilder: (context, index) {
+                  final device = state.devices[index];
+                  final isDeviceAvailable = device.status.toLowerCase() == 'active';
+                  final isMQTTReceived = state.mqttReceivedDeviceIds.contains(device.imei);
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (isDeviceAvailable) {
+                        Get.to(() => ModeSelectionScreen(device: device));
+                      } else {
+                        Get.snackbar(
+                          "Notice",
+                          "There is no data available for this device.",
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                    child: Card(
+                      color: isMQTTReceived ? Colors.white : Colors.red.shade300,
+                      margin: EdgeInsets.all(10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      child: ListTile(
+                        leading: Image.asset('assets/images/Bell_Ring.png'),
+                        title: Text(device.deviceName),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                             Text("SW Version: ${device.swVersion.isNotEmpty ? device.swVersion : 'N/A'}"),
+                             Text("Release Date: ${device.releaseDate.isNotEmpty ? device.releaseDate : 'N/A'}"),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
+              );
+            } else if (state is DeviceError) {
+              return Center(child: Text(state.message));
+            }
+            return Container();
+          },
+        ),
+      ),
     );
   }
 }
+
+ 
