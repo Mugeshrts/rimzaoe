@@ -4,7 +4,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:get/get.dart';
 import 'package:rimza1/presentation/Screens/modeselection.dart';
 import 'package:rimza1/presentation/Screens/splash.dart';
-import 'package:rimza1/service/mqtt.dart';
+import 'package:rimza1/service/mqtt.dart'; 
 
 
 void main()async{

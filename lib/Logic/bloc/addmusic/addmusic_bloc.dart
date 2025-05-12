@@ -10,6 +10,7 @@ import 'package:rimza1/Logic/bloc/addmusic/addmusic_event.dart';
 import 'package:rimza1/Logic/bloc/addmusic/addmusic_state.dart';
 import 'package:rimza1/data/audiofile.dart';
 
+
 class AudioBloc extends Bloc<AudioEvent, AudioState> {
   final AudioPlayer _player = AudioPlayer();
   final FlutterSoundRecorder _recorder = FlutterSoundRecorder();

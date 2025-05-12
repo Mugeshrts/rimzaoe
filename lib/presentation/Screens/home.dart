@@ -7,6 +7,8 @@ import 'package:rimza1/Core/network.dart';
 import 'package:rimza1/Logic/bloc/home/bloc/home_bloc.dart';
 import 'package:rimza1/Logic/bloc/home/bloc/home_event.dart';
 import 'package:rimza1/Logic/bloc/home/bloc/home_state.dart';
+import 'package:rimza1/presentation/Screens/demo.dart';
+import 'package:rimza1/presentation/Screens/demo2.dart';
 import 'package:rimza1/presentation/Screens/modeselection.dart';
 import 'package:rimza1/presentation/Screens/login.dart';
 import 'package:rimza1/service/mqtt.dart';
@@ -80,27 +82,32 @@ class _DashboardPageState extends State<DashboardPage> {
           backgroundColor: Colors.blue.shade900,
           actions: [
             Center(child: Text("v1.8", style: TextStyle(fontSize: 16))),
-            BlocBuilder<DeviceBloc, DeviceState>(
-              builder: (context, state) {
-                if (state is DeviceLoaded) {
-                  return IconButton(
-                    onPressed: () async {
-                      await MqttService.initMqtt();
-                      _deviceBloc.add(RefreshMQTTData());
-                    },
-                    icon: Lottie.asset(
-                      state.faulty == "yes"
-                          ? 'assets/lotties/red.json'
-                          : state.mqttCheck
-                              ? 'assets/lotties/green.json'
-                              : 'assets/lotties/red.json',
-                      width: 60,
-                      height: 60,
-                    ),
-                  );
-                }
-                return SizedBox.shrink();
-              },
+            SizedBox(
+              width: 70,
+                        height: 70,
+              child: BlocBuilder<DeviceBloc, DeviceState>(
+                builder: (context, state) {
+                  if (state is DeviceLoaded) {
+                    return GestureDetector(
+                      onTap: () async {
+                        await MqttService.initMqtt();
+                        _deviceBloc.add(RefreshMQTTData());
+                      },
+                      child: Lottie.asset(
+                        state.faulty == "yes"
+                            ? 'assets/lotties/red.json'
+                            : state.mqttCheck
+                                ? 'assets/lotties/green.json'
+                                : 'assets/lotties/red.json',
+                        width: 70,
+                        height: 70,
+                      ),
+                    );
+                  }
+                  // return SizedBox.shrink();
+                    return SizedBox();
+                },
+              ),
             ),
           ],
           leading: Builder(
@@ -149,7 +156,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         // Get.to(() => ModeSelectionScreen(device: device));
                         Get.to(() => ModeSelectionScreen(
       imei: device.imei,
-      dbdata: device.data ?? '', 
+      dbdata: device.data ?? '',
+      //  device: '', 
       device: device,
       // device: device.deviceName,
     ));
