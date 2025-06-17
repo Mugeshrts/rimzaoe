@@ -1,214 +1,137 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:bloc/bloc.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_sound/public/flutter_sound_recorder.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:rimza1/Logic/bloc/addmusic/addmusic_event.dart';
 import 'package:rimza1/Logic/bloc/addmusic/addmusic_state.dart';
-import 'package:rimza1/data/audiofile.dart';
 
 
-class AudioBloc extends Bloc<AudioEvent, AudioState> {
-  final AudioPlayer _player = AudioPlayer();
-  final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
-  List<AudioFile> _audioFiles = [];
-  AudioFile? _currentlyPlaying;
-  bool _isPlaying = false;
-  bool _isRecording = false;
-  String? _recordedPath;
-  int _recordDuration = 0;
-  Timer? _recordTimer;
-
-   AudioBloc() : super(AudioInitial()) {
-    on<LoadAudios>(_onLoadAudios);
-    on<AddAudio>(_onAddAudio);
-    on<DeleteAudio>(_onDeleteAudio);
+class MusicUploadBloc extends Bloc<MusicUploadEvent, MusicUploadState> {
+  MusicUploadBloc() : super(MusicUploadInitial()) {
+    on<FetchMusicList>(_onFetchMusicList);
     on<StartRecording>(_onStartRecording);
     on<StopRecording>(_onStopRecording);
-    on<PlayAudio>(_onPlayAudio);
-    on<PauseAudio>(_onPauseAudio);
-    on<PickAudios>(_onPickAudios);
+    on<StartPlayback>(_onStartPlayback);
+    on<StopPlayback>(_onStopPlayback);
+    // on<UploadFile>(_onUploadFile);
+    on<DownloadAndPlay>(_onDownloadAndPlay);
+    on<DeleteFile>(_onDeleteFile);
+     on<LoadAudios>(_onLoadAudios);
+    on<UploadAudio>(_onUploadAudio);
+     on<PickFileEvent>(_onPickFile);
+     on<UploadFileEvent>(_onUploadFile);
   }
 
-  Future<void> _onLoadAudios(LoadAudios event, Emitter<AudioState> emit) async {
-    emit(AudioLoaded(
-      audioFiles: _audioFiles,
-      currentlyPlaying: _currentlyPlaying,
-      isPlaying: _isPlaying,
-      isRecording: _isRecording,
-      recordDuration: _recordDuration,
-    ));
-  }
-
-   void _onAddAudio(AddAudio event, Emitter<AudioState> emit) {
-    _audioFiles.add(event.audioFile);
-    add(LoadAudios());
-  }
-
-
-  // Future<void> _onAddAudio(AddAudio event, Emitter<AudioState> emit) async {
-  //   _audioFiles.add(event.audioFile);
-  //   emit(AudioLoaded(
-  //     audioFiles: _audioFiles,
-  //     currentlyPlaying: _currentlyPlaying,
-  //     isPlaying: _isPlaying,
-  //     isRecording: _isRecording,
-  //     recordDuration: _recordDuration,
-  //   ));
-  // }
-
-  Future<void> _onDeleteAudio(DeleteAudio event, Emitter<AudioState> emit) async {
-    _audioFiles.remove(event.audioFile);
-    if (_currentlyPlaying?.path == event.audioFile.path) {
-      await _player.stop();
-      _currentlyPlaying = null;
-      _isPlaying = false;
-    }
-    emit(AudioLoaded(
-      audioFiles: _audioFiles,
-      currentlyPlaying: _currentlyPlaying,
-      isPlaying: _isPlaying,
-      isRecording: _isRecording,
-      recordDuration: _recordDuration,
-    ));
-  }
-
-  Future<void> _onStartRecording(StartRecording event, Emitter<AudioState> emit) async {
-    final status = await Permission.microphone.request();
-    if (!status.isGranted) {
-      emit(AudioError("Microphone permission not granted"));
-      return;
-    }
-
-    final dir = await getApplicationDocumentsDirectory();
-    final path = '${dir.path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
-    _recordedPath = path;
-
-    await _recorder.openRecorder();
-    await _recorder.startRecorder(toFile: path);
-
-    _isRecording = true;
-    _recordDuration = 0;
-
-    _recordTimer = Timer.periodic(Duration(seconds: 1), (_) {
-      _recordDuration++;
-      add(LoadAudios());
-    });
-
-    add(LoadAudios());
-  }
-
-  Future<void> _onStopRecording(StopRecording event, Emitter<AudioState> emit) async {
-    await _recorder.stopRecorder();
-    await _recorder.closeRecorder();
-    _recordTimer?.cancel();
-
-    final file = File(_recordedPath!);
-    if (await file.exists()) {
-      final audio = AudioFile(
-        path: file.path,
-        name: file.uri.pathSegments.last,
-        size: file.lengthSync(),
-        addedAt: DateTime.now(),
-      );
-
-      _audioFiles.add(audio);
-    }
-
-    _isRecording = false;
-    _recordDuration = 0;
-
-    // emit(AudioLoaded(
-    //   audioFiles: _audioFiles,
-    //   currentlyPlaying: _currentlyPlaying,
-    //   isPlaying: _isPlaying,
-    //   isRecording: _isRecording,
-    //   recordDuration: _recordDuration,
-    // ));
-    add(LoadAudios());
-  }
-
-  Future<void> _onPlayAudio(PlayAudio event, Emitter<AudioState> emit) async {
-    if (_currentlyPlaying?.path != event.audioFile.path) {
-      await _player.setFilePath(event.audioFile.path);
-      await _player.play();
-      _currentlyPlaying = event.audioFile;
-      _isPlaying = true;
-    } else {
-      if (_isPlaying) {
-        await _player.pause();
-        _isPlaying = false;
-      } else {
-        await _player.play();
-        _isPlaying = true;
-      }
-    }
-
-    // emit(AudioLoaded(
-    //   audioFiles: _audioFiles,
-    //   currentlyPlaying: _currentlyPlaying,
-    //   isPlaying: _isPlaying,
-    //   isRecording: _isRecording,
-    //   recordDuration: _recordDuration,
-    // ));
-    add(LoadAudios());
-  }
-
-  // Future<void> _onPauseAudio(PauseAudio event, Emitter<AudioState> emit) async {
-  //   await _player.pause();
-  //   _isPlaying = false;
-
-  //   emit(AudioLoaded(
-  //     audioFiles: _audioFiles,
-  //     currentlyPlaying: _currentlyPlaying,
-  //     isPlaying: _isPlaying,
-  //     isRecording: _isRecording,
-  //     recordDuration: _recordDuration,
-  //   ));
-  // }
-
- Future<void> _onPauseAudio(PauseAudio event, Emitter<AudioState> emit) async {
-    await _player.pause();
-    _isPlaying = false;
-    add(LoadAudios());
-  }
-
- Future<void> _onPickAudios(PickAudios event, Emitter<AudioState> emit) async {
-    final status = await Permission.storage.request();
-    if (!status.isGranted) {
-      emit(AudioError("Storage permission not granted"));
-      return;
-    }
-
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.audio,
-      allowMultiple: true,
+Future<void> _onPickFile(
+      PickFileEvent event, Emitter<MusicUploadState> emit) async {
+    emit(MusicUploadPicking());
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3'],
     );
-
-    if (result != null) {
-      final files = result.files.where((f) => f.path != null).map((f) {
-        final file = File(f.path!);
-        return AudioFile(
-          path: file.path,
-          name: file.uri.pathSegments.last,
-          size: file.lengthSync(),
-          addedAt: DateTime.now(),
-        );
-      }).toList();
-
-      _audioFiles.addAll(files);
-      add(LoadAudios());
+    if (result != null && result.files.single.path != null) {
+      emit(MusicUploadPicked(result.files.single.path!));
+    } else {
+      emit(MusicUploadInitial());
     }
   }
 
-  @override
-  Future<void> close() {
-    _player.dispose();
-    _recorder.closeRecorder();
-    _recordTimer?.cancel();
-    return super.close();
+Future<void> _onUploadFile(
+      UploadFileEvent event, Emitter<MusicUploadState> emit) async {
+    emit(MusicUploadUploading(0.0));
+    for (int i = 1; i <= 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      emit(MusicUploadUploading(i / 10));
+    }
+    emit(MusicUploadSuccess());
+  }
+
+
+
+  Future<void> _onFetchMusicList(
+      FetchMusicList event, Emitter<MusicUploadState> emit) async {
+    emit(MusicListLoading());
+    try {
+      // Implement your logic to fetch music list
+      final List<String> musicList = []; // Replace with actual data
+      emit(MusicListLoaded(musicList: musicList));
+    } catch (e) {
+      emit(UploadFailure(error: e.toString()));
+    }
+  }
+
+   
+
+  void _onUploadAudio(UploadAudio event, Emitter<MusicUploadState> emit) async {
+    emit(MusicUploadLoading());
+    try {
+      // Implement your upload logic here
+      // For demonstration, we'll simulate a delay
+      await Future.delayed(Duration(seconds: 2));
+      emit(MusicUploadSuccess());
+    } catch (e) {
+      emit(MusicUploadFailure(e.toString()));
+    }
+  }
+
+  Future<void> _onStartRecording(
+      StartRecording event, Emitter<MusicUploadState> emit) async {
+    // Implement your logic to start recording
+    emit(RecordingInProgress(duration: Duration.zero));
+  }
+
+void _onLoadAudios(LoadAudios event, Emitter<MusicUploadState> emit) {
+    // Implement logic to load existing audios
+    // For demonstration, we'll emit a success state directly
+    emit(MusicUploadSuccess());
+  }
+
+  Future<void> _onStopRecording(
+      StopRecording event, Emitter<MusicUploadState> emit) async {
+    // Implement your logic to stop recording
+    emit(RecordingStopped());
+  }
+
+  Future<void> _onStartPlayback(
+      StartPlayback event, Emitter<MusicUploadState> emit) async {
+    // Implement your logic to start playback
+    emit(PlaybackInProgress(duration: Duration.zero));
+  }
+
+  Future<void> _onStopPlayback(
+      StopPlayback event, Emitter<MusicUploadState> emit) async {
+    // Implement your logic to stop playback
+    emit(PlaybackStopped());
+  }
+
+  // Future<void> _onUploadFile(
+  //     UploadFile event, Emitter<MusicUploadState> emit) async {
+  //   emit(UploadInProgress(progress: 0.0));
+  //   try {
+  //     // Implement your logic to upload file
+  //     emit(UploadSuccess());
+  //   } catch (e) {
+  //     emit(UploadFailure(error: e.toString()));
+  //   }
+  // }
+
+  Future<void> _onDownloadAndPlay(
+      DownloadAndPlay event, Emitter<MusicUploadState> emit) async {
+    emit(DownloadInProgress());
+    try {
+      // Implement your logic to download and play file
+      emit(DownloadSuccess());
+    } catch (e) {
+      emit(DownloadFailure(error: e.toString()));
+    }
+  }
+
+  Future<void> _onDeleteFile(
+      DeleteFile event, Emitter<MusicUploadState> emit) async {
+    try {
+      // Implement your logic to delete file
+      emit(DeletionSuccess());
+    } catch (e) {
+      emit(DeletionFailure(error: e.toString()));
+    }
   }
 }

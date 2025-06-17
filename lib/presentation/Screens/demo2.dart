@@ -8,10 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:rimza1/data/user.dart';
-import 'package:rimza1/presentation/Screens/addmusic.dart';
-import 'package:rimza1/presentation/Screens/dvmscreen.dart';
+import 'package:rimza1/presentation/Screens/demo.dart';
+import 'package:rimza1/presentation/Screens/holidaypage.dart';
 import 'package:rimza1/presentation/Screens/regularmode.dart';
-import 'package:rimza1/presentation/Screens/scheduletask.dart';
 import 'package:rimza1/presentation/widget/widgets.dart';
 import 'package:rimza1/service/mqtt.dart';
 
@@ -42,12 +41,25 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
   final box = GetStorage();
   late DateTime now;
   Map<String, dynamic> info = {};
+  late Allday all_day;
+  late Allday dball_day;
+  String mode = "";
+  String log_arr = "";
 
   @override
   void initState() {
     super.initState();
     now = DateTime.now();
     today = box.read('isholiday') ?? "Working day";
+
+    all_day = Allday.fromJson({
+      "normal": {"MON": [], "TUE": [], "WED": [], "THU": [], "FRI": [], "SAT": [], "SUN": []},
+      "exam": {"MON": [], "TUE": [], "WED": [], "THU": [], "FRI": [], "SAT": [], "SUN": []},
+    });
+
+    dball_day = widget.dbdata is String
+        ? Allday.fromJson(jsonDecode(widget.dbdata))
+        : Allday.fromJson(widget.dbdata);
 
     currentTime = DateFormat('hh:mm:ss a').format(now);
     currentDate = DateFormat('EEE, dd-MM-yyyy').format(now);
@@ -59,8 +71,8 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
   void _startClock() {
     _timer = Timer.periodic(Duration(seconds: 1), (_) {
       setState(() {
-        currentTime = DateFormat('hh:mm:ss a').format(now);
-        currentDate = DateFormat('EEE, dd-MM-yyyy').format(now);
+        currentTime = DateFormat('hh:mm:ss a').format(DateTime.now());
+        currentDate = DateFormat('EEE, dd-MM-yyyy').format(DateTime.now());
       });
     });
   }
@@ -74,44 +86,46 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
       final imei = widget.imei;
       MqttService.subscribeTopic("$imei/deviceInfo");
       MqttService.subscribeTopic("$imei/mode");
-
-      log("Subscribed to topics");
+      MqttService.subscribeTopic("$imei/alarmlist");
+      MqttService.subscribeTopic("$imei/log");
 
       MqttService.publish("$imei/getDeviceInfo", jsonEncode({}));
       MqttService.publish("$imei/getMode", jsonEncode({"day": _getDayOfWeek()}));
-      log("Published requests");
+      MqttService.publish("$imei/getAlarmlist", jsonEncode({"day": _getDayOfWeek()}));
+      MqttService.publish("$imei/getLog", jsonEncode({}));
 
       MqttService.client.updates!.listen((events) {
-        try {
-          final topic = events[0].topic;
-          final MqttPublishMessage recMessage = events[0].payload as MqttPublishMessage;
-          final payload = MqttPublishPayload.bytesToStringAsString(
-              recMessage.payload.message);
-          log("MQTT update: topic=$topic, payload=$payload");
+        final topic = events[0].topic;
+        final MqttPublishMessage recMessage = events[0].payload as MqttPublishMessage;
+        final payload = MqttPublishPayload.bytesToStringAsString(recMessage.payload.message);
 
-          if (topic == "$imei/deviceInfo") {
-            final parsed = safeJsonDecode(payload);
-            if (parsed != null && parsed["System Time"] != null) {
-              DateTime systemTime =
-                  DateFormat("dd-MM-yyyy HH:mm:ss").parse(parsed["System Time"]);
-              setState(() {
-                info = parsed;
-                now = systemTime;
-                mqttConnected = true;
-              });
-            }
-          } else if (topic == "$imei/mode") {
-            final modeData = safeJsonDecode(payload);
-            if (modeData != null) {
-              final dayKey = _getDayOfWeek();
-              final currentMode = modeData[dayKey];
-              setState(() {
-                isExamMode = currentMode == "exam";
-              });
-            }
+        if (topic == "$imei/deviceInfo") {
+          final parsed = safeJsonDecode(payload);
+          if (parsed != null && parsed["System Time"] != null) {
+            DateTime systemTime = DateFormat("dd-MM-yyyy HH:mm:ss").parse(parsed["System Time"]);
+            setState(() {
+              info = parsed;
+              now = systemTime;
+              mqttConnected = true;
+            });
           }
-        } catch (e, st) {
-          log("MQTT message error", error: e, stackTrace: st);
+        } else if (topic == "$imei/mode") {
+          final modeData = safeJsonDecode(payload);
+          if (modeData != null) {
+            final dayKey = _getDayOfWeek();
+            final currentMode = modeData[dayKey];
+            setState(() {
+              mode = currentMode;
+              isExamMode = currentMode == "exam";
+            });
+          }
+        } else if (topic == "$imei/alarmlist") {
+          final jsonMap = safeJsonDecode(payload);
+          if (jsonMap != null && jsonMap is Map<String, dynamic>) {
+            all_day = Allday.fromJson(jsonMap);
+          }
+        } else if (topic == "$imei/log") {
+          log_arr = payload;
         }
       });
     } catch (e, st) {
@@ -128,20 +142,13 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
     setState(() {
       isExamMode = !isExamMode;
     });
-
     final newMode = isExamMode ? "exam" : "normal";
-    try {
-      log("Publishing new mode: $newMode");
-      MqttService.publish("${widget.imei}/exam_mode", jsonEncode({"mode": newMode}));
-      MqttService.publish("${widget.imei}/getMode", jsonEncode({"day": _getDayOfWeek()}));
-    } catch (e) {
-      log("Error publishing mode switch: $e");
-    }
+    MqttService.publish("${widget.imei}/exam_mode", jsonEncode({"mode": newMode}));
+    MqttService.publish("${widget.imei}/getMode", jsonEncode({"day": _getDayOfWeek()}));
   }
 
   @override
   void dispose() {
-    log("Disposing ModeSelectionScreen");
     _timer?.cancel();
     super.dispose();
   }
@@ -157,9 +164,7 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
         ),
         actions: [
           Lottie.asset(
-            mqttConnected
-                ? 'assets/lotties/green.json'
-                : 'assets/lotties/red.json',
+            mqttConnected ? 'assets/lotties/green.json' : 'assets/lotties/red.json',
             width: 60,
             height: 60,
           ),
@@ -205,15 +210,7 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          currentTime,
-                          style: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: "Technology",
-                            color: Colors.black,
-                          ),
-                        ),
+                        Text(currentTime, style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, fontFamily: "Technology", color: Colors.black)),
                         SizedBox(height: 4),
                         Text(currentDate, style: TextStyle(fontSize: 15)),
                         SizedBox(height: 4),
@@ -221,12 +218,7 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    height: 100,
-                    width: 1,
-                    color: Colors.black,
-                    margin: EdgeInsets.symmetric(horizontal: 35),
-                  ),
+                  Container(height: 100, width: 1, color: Colors.black, margin: EdgeInsets.symmetric(horizontal: 35)),
                   Column(
                     children: [
                       Container(
@@ -273,25 +265,124 @@ class _ModeSelectionScreenState extends State<ModeSelectionScreen> {
               ),
             ),
             SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Column(
-                  children: [
-                    ModeCard(icon: Icons.alarm, text: "Regular Mode", onTap: () => Get.to(() => WeekTabPage())),
-                    ModeCard(icon: Icons.edit_document, text: "Exam Mode", onTap: () {}),
-                    ModeCard(icon: Icons.calendar_month_outlined, text: "Holiday", onTap: () {}),
-                  ],
-                ),
-                Column(
-                  children: [
-                    ModeCard(icon: Icons.music_note_sharp, text: "Music", onTap: () {}),
-                    ModeCard(icon: Icons.timer, text: "SVM", onTap: () => Get.to(() => Scheduletask())),
-                    ModeCard(icon: Icons.speaker, text: "DVM", onTap: () => Get.to(() => Dvmscreen())),
-                  ],
-                ),
-              ],
-            ),
+           Row(
+  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  children: [
+    Column(
+      children: [
+        ModeCard(
+          icon: Icons.alarm,
+          text: "Regular Mode",
+          onTap: () {
+            try {
+              final data = mqttConnected
+                  ? all_day.toMapNormal()
+                  : dball_day.toMapNormal();
+              Get.to(() => WeekTabPage(
+                mode: "normal",
+                imei: widget.imei,
+                data: data,
+              ));
+            } catch (e, st) {
+              log("Regular Mode error", error: e, stackTrace: st);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to load Regular Mode"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        ModeCard(
+          icon: Icons.edit_document,
+          text: "Exam Mode",
+          onTap: () {
+            try {
+              final data = mqttConnected
+                  ? all_day.toMapExam()
+                  : dball_day.toMapExam();
+              Get.to(() => WeekTabPage(
+                mode: "exam",
+                imei: widget.imei,
+                data: data,
+              ));
+            } catch (e, st) {
+              log("Exam Mode error", error: e, stackTrace: st);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to load Exam Mode"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        ModeCard(
+          icon: Icons.calendar_month_outlined,
+          text: "Holiday",
+          onTap: () {
+            try {
+              Get.to(() => Holidaypage(imei: widget.imei));
+            } catch (e) {
+              log("Holiday navigation error", error: e);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to open Holiday page"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+      ],
+    ),
+    Column(
+      children: [
+        ModeCard(
+          icon: Icons.music_note_sharp,
+          text: "Music",
+          onTap: () {
+            try {
+              Get.to(() => MusicUpload(imei: widget.imei));
+            } catch (e) {
+              log("Music upload navigation error", error: e);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to open Music page"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        ModeCard(
+          icon: Icons.timer,
+          text: "SVM",
+          onTap: () {
+            try {
+              // Get.to(() => Scheduletask(imei: widget.imei));
+            } catch (e) {
+              log("SVM navigation error", error: e);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to open SVM"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+        ModeCard(
+          icon: Icons.speaker,
+          text: "DVM",
+          onTap: () {
+            try {
+              if (info['SW Version'] != null) {
+                // Get.to(() => Dvmscreen(imei: widget.imei));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Device is Offline'), backgroundColor: Colors.orange),
+                );
+              }
+            } catch (e) {
+              log("DVM navigation error", error: e);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Failed to open DVM"), backgroundColor: Colors.red),
+              );
+            }
+          },
+        ),
+      ],
+    ),
+  ],
+),
+
           ],
         ),
       ),

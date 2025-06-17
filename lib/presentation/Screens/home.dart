@@ -66,7 +66,10 @@ class _DashboardPageState extends State<DashboardPage> {
               DrawerHeader(
                 decoration: BoxDecoration(color: Colors.blue.shade900),
                 child: Center(
-                  child: Text("Welcome 👋", style: TextStyle(color: Colors.white, fontSize: 20)),
+                  child: Text(
+                    "Welcome 👋",
+                    style: TextStyle(color: Colors.white, fontSize: 20),
+                  ),
                 ),
               ),
               ListTile(
@@ -84,7 +87,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Center(child: Text("v1.8", style: TextStyle(fontSize: 16))),
             SizedBox(
               width: 70,
-                        height: 70,
+              height: 70,
               child: BlocBuilder<DeviceBloc, DeviceState>(
                 builder: (context, state) {
                   if (state is DeviceLoaded) {
@@ -97,29 +100,33 @@ class _DashboardPageState extends State<DashboardPage> {
                         state.faulty == "yes"
                             ? 'assets/lotties/red.json'
                             : state.mqttCheck
-                                ? 'assets/lotties/green.json'
-                                : 'assets/lotties/red.json',
+                            ? 'assets/lotties/green.json'
+                            : 'assets/lotties/red.json',
                         width: 70,
                         height: 70,
                       ),
                     );
                   }
                   // return SizedBox.shrink();
-                    return SizedBox();
+                  return SizedBox();
                 },
               ),
             ),
           ],
           leading: Builder(
-            builder: (context) => IconButton(
-              icon: Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
+            builder:
+                (context) => IconButton(
+                  icon: Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
           ),
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(60),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8,
+              ),
               child: TextField(
                 controller: _searchController,
                 onChanged: (query) => _deviceBloc.add(SearchDevices(query)),
@@ -128,7 +135,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   fillColor: Colors.white,
                   filled: true,
                   prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -140,7 +149,12 @@ class _DashboardPageState extends State<DashboardPage> {
               return Center(child: CircularProgressIndicator());
             } else if (state is DeviceLoaded) {
               if (state.devices.isEmpty) {
-                return Center(child: Text("No device available", style: TextStyle(fontSize: 18)));
+                return Center(
+                  child: Text(
+                    "No device available",
+                    style: TextStyle(fontSize: 18),
+                  ),
+                );
               }
 
               return ListView.builder(
@@ -148,36 +162,51 @@ class _DashboardPageState extends State<DashboardPage> {
                 itemBuilder: (context, index) {
                   final device = state.devices[index];
                   final isActive = device.status.toLowerCase() == 'active';
-                  final hasMqtt = state.mqttReceivedDeviceIds.contains(device.imei);
+                  final hasMqtt = state.mqttReceivedDeviceIds.contains(
+                    device.imei,
+                  );
 
                   return GestureDetector(
                     onTap: () {
                       if (isActive) {
                         // Get.to(() => ModeSelectionScreen(device: device));
-                        Get.to(() => ModeSelectionScreen(
-      imei: device.imei,
-      dbdata: device.data ?? '',
-      //  device: '', 
-      device: device,
-      // device: device.deviceName,
-    ));
+                        Get.to(
+                          () => ModeSelectionScreen(
+                            imei: device.imei,
+                            dbdata: device.data ?? '',
+                            //  device: '',
+                            device: device,
+                            //  mode: '',
+                            // device: device.deviceName,
+                          ),
+                        );
                       } else {
-                        Get.snackbar("Notice", "There is no data available for this device.",
-                            backgroundColor: Colors.redAccent, colorText: Colors.white);
+                        Get.snackbar(
+                          "Notice",
+                          "There is no data available for this device.",
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
                       }
                     },
                     child: Card(
                       color: hasMqtt ? Colors.white : Colors.red.shade300,
                       margin: EdgeInsets.all(10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
                       child: ListTile(
                         leading: Image.asset('assets/images/Bell_Ring.png'),
                         title: Text(device.deviceName),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("SW Version: ${device.swVersion.isNotEmpty ? device.swVersion : 'N/A'}"),
-                            Text("Release Date: ${device.releaseDate.isNotEmpty ? device.releaseDate : 'N/A'}"),
+                            Text(
+                              "SW Version: ${device.swVersion.isNotEmpty ? device.swVersion : 'N/A'}",
+                            ),
+                            Text(
+                              "Release Date: ${device.releaseDate.isNotEmpty ? device.releaseDate : 'N/A'}",
+                            ),
                           ],
                         ),
                       ),
